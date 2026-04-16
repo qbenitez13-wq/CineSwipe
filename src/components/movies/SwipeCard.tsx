@@ -23,7 +23,7 @@ interface SwipeCardProps {
  * SwipeCard: Componente interactivo para descubrimiento de películas.
  * Implementa gestos de swipe nativos con Pointer Events.
  */
-export const SwipeCard: React.FC<SwipeCardProps> = ({ movie, onSwipe }) => {
+export const SwipeCard = React.memo<SwipeCardProps>(({ movie, onSwipe }) => {
   // --- ESTADO ---
   const [offsetX, setOffsetX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -186,7 +186,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ movie, onSwipe }) => {
       </div>
     </div>
   );
-};
+});
 
 /* 
 // EJEMPLO DE USO:

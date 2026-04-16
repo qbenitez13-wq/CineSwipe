@@ -1,0 +1,6 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Sitemaps (Sustituir por URL real cuando se despliegue)
+# Sitemap: https://cineswipe.app/sitemap.xml
