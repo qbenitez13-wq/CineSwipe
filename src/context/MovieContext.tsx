@@ -1,3 +1,5 @@
+'use client';
+
 import React, { createContext, useContext, useReducer, useMemo, useEffect, ReactNode } from 'react';
 
 // --- TIPOS ---
@@ -24,33 +26,34 @@ interface PersistedState {
 
 type Action =
   | { type: 'SWIPE_RIGHT'; payload: number }
-  | { type: 'SWIPE_LEFT'; payload: number }
+  | { type: 'SWIPE_LEFT';  payload: number }
   | { type: 'UNDO_LAST' }
-  | { type: 'CLEAR_HISTORY' };
+  | { type: 'CLEAR_HISTORY' }
+  | { type: 'SYNC_FROM_CLOUD'; payload: { likedIds: number[]; dislikedIds: number[] } };
 
 // --- CONSTANTES ---
 const STORAGE_KEY = 'cineswipe_history';
 const MAX_HISTORY = 50;
 
-// --- INICIALIZADOR (Solución P3: Lazy Initialization) ---
+// --- INICIALIZADOR (Lazy Initialization) ---
 
 const initialState: MovieState = {
-  likedIds: new Set(),
+  likedIds:    new Set(),
   dislikedIds: new Set(),
-  history: [],
+  history:     [],
 };
 
 const init = (initialArg: MovieState): MovieState => {
   if (typeof window === 'undefined') return initialArg;
-  
+
   const saved = localStorage.getItem(STORAGE_KEY);
   if (!saved) return initialArg;
 
   try {
     const parsed: PersistedState = JSON.parse(saved);
     return {
-      history: parsed.history,
-      likedIds: new Set(parsed.likedIds),
+      history:     parsed.history,
+      likedIds:    new Set(parsed.likedIds),
       dislikedIds: new Set(parsed.dislikedIds),
     };
   } catch (e) {
@@ -59,7 +62,7 @@ const init = (initialArg: MovieState): MovieState => {
   }
 };
 
-// --- REDUCER (Solución P4: O(1) Lookups con Sets) ---
+// --- REDUCER ---
 
 function movieReducer(state: MovieState, action: Action): MovieState {
   switch (action.type) {
@@ -68,55 +71,60 @@ function movieReducer(state: MovieState, action: Action): MovieState {
       const isRight = action.type === 'SWIPE_RIGHT';
       const type: SwipeDirection = isRight ? 'right' : 'left';
       const newAction: MovieAction = { id: action.payload, type };
-      
-      const nextHistory = [...state.history, newAction];
-      const nextLiked = new Set(state.likedIds);
-      const nextDisliked = new Set(state.dislikedIds);
+
+      const nextHistory    = [...state.history, newAction];
+      const nextLiked      = new Set(state.likedIds);
+      const nextDisliked   = new Set(state.dislikedIds);
 
       if (isRight) nextLiked.add(action.payload);
-      else nextDisliked.add(action.payload);
+      else         nextDisliked.add(action.payload);
 
-      // Lógica FIFO
+      // FIFO: elimina el más antiguo al superar el límite
       if (nextHistory.length > MAX_HISTORY) {
         const removed = nextHistory.shift();
         if (removed) {
           if (removed.type === 'right') nextLiked.delete(removed.id);
-          else nextDisliked.delete(removed.id);
+          else                          nextDisliked.delete(removed.id);
         }
       }
 
-      return {
-        likedIds: nextLiked,
-        dislikedIds: nextDisliked,
-        history: nextHistory,
-      };
+      return { likedIds: nextLiked, dislikedIds: nextDisliked, history: nextHistory };
     }
 
     case 'UNDO_LAST': {
       if (state.history.length === 0) return state;
 
-      const lastAction = state.history[state.history.length - 1];
-      const nextHistory = state.history.slice(0, -1);
-      
-      const nextLiked = new Set(state.likedIds);
+      const lastAction   = state.history[state.history.length - 1];
+      const nextHistory  = state.history.slice(0, -1);
+      const nextLiked    = new Set(state.likedIds);
       const nextDisliked = new Set(state.dislikedIds);
 
       if (lastAction.type === 'right') nextLiked.delete(lastAction.id);
-      else nextDisliked.delete(lastAction.id);
+      else                             nextDisliked.delete(lastAction.id);
 
-      return {
-        history: nextHistory,
-        likedIds: nextLiked,
-        dislikedIds: nextDisliked,
-      };
+      return { history: nextHistory, likedIds: nextLiked, dislikedIds: nextDisliked };
     }
 
     case 'CLEAR_HISTORY':
+      return { likedIds: new Set(), dislikedIds: new Set(), history: [] };
+
+    // ── NUEVA ACCIÓN: hidrata el estado desde Supabase al hacer login ──
+    case 'SYNC_FROM_CLOUD': {
+      const cloudLiked    = new Set(action.payload.likedIds);
+      const cloudDisliked = new Set(action.payload.dislikedIds);
+
+      // Fusión: unión de lo local + lo remoto
+      const mergedLiked    = new Set([...state.likedIds,    ...cloudLiked]);
+      const mergedDisliked = new Set([...state.dislikedIds, ...cloudDisliked]);
+
+      // Reconstruir history básico a partir de los registros de la nube
+      // (el history detallado no se persiste en la nube, pero la lista sí)
       return {
-        likedIds: new Set(),
-        dislikedIds: new Set(),
-        history: [],
+        likedIds:    mergedLiked,
+        dislikedIds: mergedDisliked,
+        history:     state.history, // mantenemos el historial local para el undo
       };
+    }
 
     default:
       return state;
@@ -125,26 +133,25 @@ function movieReducer(state: MovieState, action: Action): MovieState {
 
 // --- CONTEXTOS ---
 
-const MovieStateContext = createContext<MovieState | undefined>(undefined);
+const MovieStateContext    = createContext<MovieState | undefined>(undefined);
 const MovieDispatchContext = createContext<React.Dispatch<Action> | undefined>(undefined);
 
 // --- PROVIDER ---
 
 export const MovieProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Inicialización síncrona para evitar parpadeos
   const [state, dispatch] = useReducer(movieReducer, initialState, init);
 
-  // Persistencia automática (Conversión de Set a Array para JSON)
+  // Persistencia automática en localStorage
   useEffect(() => {
     const stateToSave: PersistedState = {
-      history: state.history,
-      likedIds: Array.from(state.likedIds),
+      history:     state.history,
+      likedIds:    Array.from(state.likedIds),
       dislikedIds: Array.from(state.dislikedIds),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
   }, [state]);
 
-  const stateValue = useMemo(() => state, [state]);
+  const stateValue    = useMemo(() => state,    [state]);
   const dispatchValue = useMemo(() => dispatch, []);
 
   return (
@@ -173,9 +180,11 @@ export const useMovieActions = () => {
   }
 
   return useMemo(() => ({
-    swipeRight: (id: number) => dispatch({ type: 'SWIPE_RIGHT', payload: id }),
-    swipeLeft: (id: number) => dispatch({ type: 'SWIPE_LEFT', payload: id }),
-    undoLast: () => dispatch({ type: 'UNDO_LAST' }),
-    clearHistory: () => dispatch({ type: 'CLEAR_HISTORY' }),
+    swipeRight:    (id: number) => dispatch({ type: 'SWIPE_RIGHT', payload: id }),
+    swipeLeft:     (id: number) => dispatch({ type: 'SWIPE_LEFT',  payload: id }),
+    undoLast:      ()           => dispatch({ type: 'UNDO_LAST' }),
+    clearHistory:  ()           => dispatch({ type: 'CLEAR_HISTORY' }),
+    syncFromCloud: (likedIds: number[], dislikedIds: number[]) =>
+      dispatch({ type: 'SYNC_FROM_CLOUD', payload: { likedIds, dislikedIds } }),
   }), [dispatch]);
 };

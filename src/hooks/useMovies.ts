@@ -1,8 +1,9 @@
+'use client';
+
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { TMDBMovie, TMDBResponse, MovieFilters, CacheEntry } from '../types/tmdb.types';
 
-const API_TOKEN = import.meta.env.VITE_TMDB_TOKEN;
-const BASE_URL = 'https://api.themoviedb.org/3';
+const BASE_URL = '/api/movies'; // Apuntamos a nuestro Proxy local
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos en ms
 
@@ -60,7 +61,7 @@ export const useMovies = (filters: MovieFilters = {}) => {
     setError(null);
 
     try {
-      const url = new URL(`${BASE_URL}/discover/movie`);
+      const url = new URL(window.location.origin + BASE_URL);
       url.searchParams.append('page', targetPage.toString());
       url.searchParams.append('sort_by', 'popularity.desc');
       url.searchParams.append('include_adult', 'false');
@@ -74,7 +75,6 @@ export const useMovies = (filters: MovieFilters = {}) => {
       const response = await fetch(url.toString(), {
         signal: abortControllerRef.current.signal,
         headers: {
-          'Authorization': `Bearer ${API_TOKEN}`,
           'accept': 'application/json'
         }
       });
