@@ -47,18 +47,20 @@ const initialState: MovieState = {
 const init = (initialArg: MovieState): MovieState => {
   if (typeof window === 'undefined') return initialArg;
 
+  // Si quieres que siempre empiece limpio al "entrar por primera vez", 
+  // podríamos comentar esta rehidratación, pero para mantener la 
+  // funcionalidad anónima, solo la ejecutamos si existe el dato.
   const saved = localStorage.getItem(STORAGE_KEY);
   if (!saved) return initialArg;
 
   try {
     const parsed: PersistedState = JSON.parse(saved);
     return {
-      history:     parsed.history,
-      likedIds:    new Set(parsed.likedIds),
-      dislikedIds: new Set(parsed.dislikedIds),
+      history:     parsed.history || [],
+      likedIds:    new Set(parsed.likedIds || []),
+      dislikedIds: new Set(parsed.dislikedIds || []),
     };
   } catch (e) {
-    console.error('Error rehidratando historial:', e);
     return initialArg;
   }
 };
