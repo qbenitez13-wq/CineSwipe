@@ -32,6 +32,7 @@ export const useAuth = (): AuthState => {
     // Escuchar cambios de sesión (login, logout, refresh de token)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      setLoading(false); // <--- Vital para que la UI se entere del cambio
     });
 
     return () => subscription.unsubscribe();

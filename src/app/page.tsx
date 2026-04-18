@@ -65,6 +65,7 @@ export default function Home() {
   };
 
   const handleSignOut = async () => {
+    resetState(); // Limpia estado local
     await auth.signOut();
   };
 

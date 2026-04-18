@@ -29,6 +29,7 @@ type Action =
   | { type: 'SWIPE_LEFT';  payload: number }
   | { type: 'UNDO_LAST' }
   | { type: 'CLEAR_HISTORY' }
+  | { type: 'RESET_STATE' }
   | { type: 'SYNC_FROM_CLOUD'; payload: { likedIds: number[]; dislikedIds: number[] } };
 
 // --- CONSTANTES ---
@@ -108,6 +109,10 @@ function movieReducer(state: MovieState, action: Action): MovieState {
     case 'CLEAR_HISTORY':
       return { likedIds: new Set(), dislikedIds: new Set(), history: [] };
 
+    case 'RESET_STATE':
+      if (typeof window !== 'undefined') localStorage.removeItem(STORAGE_KEY);
+      return { likedIds: new Set(), dislikedIds: new Set(), history: [] };
+
     // ── NUEVA ACCIÓN: hidrata el estado desde Supabase al hacer login ──
     case 'SYNC_FROM_CLOUD': {
       const cloudLiked    = new Set(action.payload.likedIds);
@@ -184,6 +189,7 @@ export const useMovieActions = () => {
     swipeLeft:     (id: number) => dispatch({ type: 'SWIPE_LEFT',  payload: id }),
     undoLast:      ()           => dispatch({ type: 'UNDO_LAST' }),
     clearHistory:  ()           => dispatch({ type: 'CLEAR_HISTORY' }),
+    resetState:    ()           => dispatch({ type: 'RESET_STATE' }),
     syncFromCloud: (likedIds: number[], dislikedIds: number[]) =>
       dispatch({ type: 'SYNC_FROM_CLOUD', payload: { likedIds, dislikedIds } }),
   }), [dispatch]);
