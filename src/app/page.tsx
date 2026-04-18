@@ -11,7 +11,7 @@ import { Undo2, History, RotateCcw, AlertCircle, Loader2, LogIn, LogOut, User } 
 
 export default function Home() {
   const { movies, loading, error, hasMore, loadMore } = useMovies();
-  const { swipeRight, swipeLeft, undoLast, clearHistory, syncFromCloud } = useMovieActions();
+  const { swipeRight, swipeLeft, undoLast, clearHistory, resetState, syncFromCloud } = useMovieActions();
   const { likedIds, history } = useMovieHistory();
 
   const auth = useAuth();
